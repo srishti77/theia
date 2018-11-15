@@ -20,11 +20,14 @@ import { CancellationToken } from '@theia/core/lib/common/cancellation';
 import { WorkspaceExt, WorkspaceFolderPickOptionsMain, WorkspaceMain, PLUGIN_RPC_CONTEXT as Ext } from '../api/plugin-api';
 import { Path } from '@theia/core/lib/common/path';
 import { RPCProtocol } from '../api/rpc-protocol';
+import { FileChangeEvent } from '../api/model';
+import { InPluginFileSystemWatcherProxy } from './filesystem-watcher-proxy';
 import URI from 'vscode-uri';
 
 export class WorkspaceExtImpl implements WorkspaceExt {
 
     private proxy: WorkspaceMain;
+    private fileSystemWatcherManager: InPluginFileSystemWatcherProxy;
 
     private workspaceFoldersChangedEmitter = new Emitter<WorkspaceFoldersChangeEvent>();
     public readonly onDidChangeWorkspaceFolders: Event<WorkspaceFoldersChangeEvent> = this.workspaceFoldersChangedEmitter.event;
@@ -33,6 +36,7 @@ export class WorkspaceExtImpl implements WorkspaceExt {
 
     constructor(rpc: RPCProtocol) {
         this.proxy = rpc.getProxy(Ext.WORKSPACE_MAIN);
+        this.fileSystemWatcherManager = new InPluginFileSystemWatcherProxy(this.proxy);
     }
 
     get workspaceFolders(): WorkspaceFolder[] | undefined {
@@ -66,7 +70,7 @@ export class WorkspaceExtImpl implements WorkspaceExt {
     }
 
     findFiles(include: GlobPattern, exclude?: GlobPattern | undefined, maxResults?: number,
-              token: CancellationToken = CancellationToken.None): PromiseLike<URI[]> {
+        token: CancellationToken = CancellationToken.None): PromiseLike<URI[]> {
         let includePattern: string;
         if (include) {
             if (typeof include === 'string') {
@@ -100,8 +104,11 @@ export class WorkspaceExtImpl implements WorkspaceExt {
     }
 
     createFileSystemWatcher(globPattern: GlobPattern, ignoreCreateEvents?: boolean, ignoreChangeEvents?: boolean, ignoreDeleteEvents?: boolean): FileSystemWatcher {
-        // FIXME: to implement
-        return new Proxy(<FileSystemWatcher>{}, {});
+        return this.fileSystemWatcherManager.createFileSystemWatcher(globPattern, ignoreCreateEvents, ignoreChangeEvents, ignoreDeleteEvents);
+    }
+
+    $fileChanged(event: FileChangeEvent): void {
+        this.fileSystemWatcherManager.onFileSystemEvent(event.subscriberId, URI.parse(event.uri), event.type);
     }
 
 }

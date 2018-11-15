@@ -41,7 +41,9 @@ import {
     DefinitionLink,
     DocumentLink,
     Command,
-    TextEdit
+    TextEdit,
+    FileWatcherSubscriberOptions,
+    FileChangeEvent
 } from './model';
 
 export interface PluginInitData {
@@ -318,11 +320,13 @@ export interface WorkspaceMain {
     $pickWorkspaceFolder(options: WorkspaceFolderPickOptionsMain): Promise<theia.WorkspaceFolder | undefined>;
     $startFileSearch(includePattern: string, excludePatternOrDisregardExcludes: string | false,
         maxResults: number | undefined, token: theia.CancellationToken): PromiseLike<UriComponents[]>;
-
+    $registerFileSystemWatcher(options: FileWatcherSubscriberOptions): Promise<string>;
+    $unregisterFileSystemWatcher(watcherId: string): Promise<void>;
 }
 
 export interface WorkspaceExt {
     $onWorkspaceFoldersChanged(event: theia.WorkspaceFoldersChangeEvent): void;
+    $fileChanged(event: FileChangeEvent): void;
 }
 
 export interface DialogsMain {

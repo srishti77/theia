@@ -26,6 +26,8 @@ import { QuickOpenModel, QuickOpenItem, QuickOpenMode } from '@theia/core/lib/br
 import { MonacoQuickOpenService } from '@theia/monaco/lib/browser/monaco-quick-open-service';
 import { FileStat } from '@theia/filesystem/lib/common';
 import { FileSearchService } from '@theia/file-search/lib/common/file-search-service';
+import { FileWatcherSubscriberOptions } from '../../api/model';
+import { InPluginFileSystemWatcherManager } from './in-plugin-filesystem-watcher-manager';
 
 export class WorkspaceMainImpl implements WorkspaceMain {
 
@@ -35,6 +37,8 @@ export class WorkspaceMainImpl implements WorkspaceMain {
 
     private fileSearchService: FileSearchService;
 
+    private inPluginFileSystemWatcherManager: InPluginFileSystemWatcherManager;
+
     private roots: FileStat[];
 
     constructor(rpc: RPCProtocol, container: interfaces.Container) {
@@ -42,6 +46,8 @@ export class WorkspaceMainImpl implements WorkspaceMain {
         this.quickOpenService = container.get(MonacoQuickOpenService);
         const workspaceService = container.get(WorkspaceService);
         this.fileSearchService = container.get(FileSearchService);
+
+        this.inPluginFileSystemWatcherManager = new InPluginFileSystemWatcherManager(this.proxy, container);
 
         workspaceService.roots.then(roots => {
             this.roots = roots;
@@ -131,15 +137,15 @@ export class WorkspaceMainImpl implements WorkspaceMain {
     }
 
     $startFileSearch(includePattern: string, excludePatternOrDisregardExcludes?: string | false,
-                     maxResults?: number, token?: theia.CancellationToken): Promise<UriComponents[]> {
+        maxResults?: number, token?: theia.CancellationToken): Promise<UriComponents[]> {
         const uris: UriComponents[] = new Array();
         let j = 0;
         const promises: Promise<any>[] = new Array();
         for (const root of this.roots) {
-            promises[j++] = this.fileSearchService.find(includePattern, {rootUri: root.uri}).then(value => {
+            promises[j++] = this.fileSearchService.find(includePattern, { rootUri: root.uri }).then(value => {
                 const paths: string[] = new Array();
                 let i = 0;
-                value.forEach( item => {
+                value.forEach(item => {
                     let path: string;
                     path = root.uri.endsWith('/') ? root.uri + item : root.uri + '/' + item;
                     paths[i++] = path;
@@ -153,6 +159,16 @@ export class WorkspaceMainImpl implements WorkspaceMain {
                 uris[i++] = Uri.parse(path);
             });
             return Promise.resolve(uris);
-            });
+        });
     }
+
+    $registerFileSystemWatcher(options: FileWatcherSubscriberOptions): Promise<string> {
+        return Promise.resolve(this.inPluginFileSystemWatcherManager.registerFileWatchSubscription(options));
+    }
+
+    $unregisterFileSystemWatcher(watcherId: string): Promise<void> {
+        this.inPluginFileSystemWatcherManager.unregisterFileWatchSubscription(watcherId);
+        return Promise.resolve();
+    }
+
 }
